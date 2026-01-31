@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>스마트 점검 체크리스트</title>
+    <!-- 웹앱 설정 (아이폰/안드로이드 홈 화면 추가 시 앱처럼 보이게 함) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#ff6b6b">
+    <!-- 엑셀 내보내기 기능을 위한 라이브러리 (SheetJS) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #ff6b6b; /* 적색 파스텔 톤 (Soft Red) */
+            --bg-color: #fff5f5; /* 아주 연한 붉은빛 배경 */
+            --card-bg: #ffffff;
+        }
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0; /* 전체 화면 사용을 위해 패딩 제거 */
+            color: #333;
+            height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            height: 100%; /* 컨테이너 높이 확보 */
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+        h2, h3 { margin-top: 0; }
+        
+        /* 카드 스타일 */
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden; /* 내부 스크롤을 위해 넘치는 내용 숨김 */
+        }
+        
+        /* 화면 꽉 차게 하기 위한 스타일 */
+        .card.full-screen {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        /* 입력 필드 스타일 */
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        input[type="text"], input[type="date"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+
+        /* 재서비스율 가짜 입력창 (좌우 배치) */
+        .fake-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 1rem;
+            background-color: #fff;
+            display: flex;
+            justify-content: space-between; /* 좌우 끝으로 배치 */
+            align-items: center;
+            cursor: pointer;
+            color: #333;
+        }
+        .fake-input span {
+            font-weight: bold;
+        }
+        .fake-input .placeholder { color: #888; font-weight: normal; }
+
+        /* 선택 그리드 스타일 (아이콘/버튼 형태) */
+        .grid-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1; /* 남은 공간 차지 */
+            overflow-y: auto; /* 내용이 많으면 스크롤 */
+        }
+        
+        /* 증상 선택 그리드 (리스트 형태 변형) */
+        #symptomGrid .option-card {
+            flex-direction: row; /* 가로 배치 */
+            justify-content: flex-start; /* 좌측 정렬 */
+            text-align: left;
+            padding: 20px;
+            height: auto; /* 높이 자동 */
+            flex: 0 0 auto; /* 크기 고정 안함 */
+        }
+        #symptomGrid .option-card img {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 0;
+            margin-right: 20px;
+        }
+        #symptomGrid .option-card span {
+            font-size: 1.1rem;
+        }
+
+        .option-card {
+            background: #fff;
+            border: 2px solid #eee;
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+            color: #555;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center; /* 수직 중앙 정렬 */
+            flex: 1; /* 남은 공간 균등 분할 */
+        }
+        .option-card.selected {
+            border-color: var(--primary-color);
+            background-color: #ffe3e3; /* 선택 시 연한 파스텔 레드 배경 */
+            color: var(--primary-color);
+        }
+
+        /* 제품 아이콘 스타일 */
+        .option-card img {
+            width: 120px; height: 120px; margin-bottom: 15px; object-fit: contain;
+        }
+
+        /* 체크박스 스타일 */
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 12px; /* 박스 형태 */
+            margin-bottom: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .checklist-item:active { transform: scale(0.99); }
+        .checklist-item.checked { border-color: var(--primary-color); background-color: #fff0f0; }
+
+        .checklist-item input[type="checkbox"] {
+            width: 24px;
+            height: 24px;
+            margin-right: 20px;
+            accent-color: var(--primary-color);
+        }
+        .checklist-item label {
+            font-size: 1rem;
+            line-height: 1.6; /* 줄 간격을 넓혀 가독성 확보 */
+            flex: 1; /* 남은 공간을 모두 차지하여 클릭 영역 확대 */
+            cursor: pointer; /* 클릭 가능하다는 손가락 커서 표시 */
+            display: flex; /* 내부 요소 정렬을 위해 flex 사용 */
+            align-items: center; /* 수직 중앙 정렬 */
+        }
+
+        /* 점검 단계 번호 뱃지 스타일 */
+        .step-badge {
+            background: #ffeaea; /* 뱃지 배경도 연한 붉은 톤으로 */
+            color: var(--primary-color);
+            min-width: 45px;
+            height: 45px;
+            border-radius: 10px; /* 둥근 사각형 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem; /* 숫자 크게 */
+            font-weight: 900;
+            margin-right: 20px;
+            flex-shrink: 0;
+            border: 2px solid #dee2e6;
+        }
+        
+        /* 체크리스트 영역 스크롤 */
+        #checklistItems {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        /* 진행률 바 스타일 */
+        .progress-container {
+            width: 100%;
+            background-color: #e9ecef;
+            border-radius: 8px;
+            height: 10px;
+            margin-bottom: 5px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: var(--primary-color);
+            transition: width 0.3s ease;
+        }
+
+        /* 버튼 스타일 */
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .btn:active { background-color: #fa5252; }
+        .btn-success { background-color: #69db7c; } /* 파스텔 그린 */
+        
+        /* 숨김 클래스 */
+        .hidden { display: none !important; }
+
+        /* 1. 스플래시 화면 스타일 */
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--primary-color);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            text-align: center;
+            cursor: pointer;
+        }
+        #splashScreen h1 {
+            font-size: 2.5rem;
+            line-height: 1.4;
+            margin-bottom: 40px;
+        }
+        #splashScreen .click-hint {
+            position: absolute;
+            bottom: 50px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            animation: blink 2s infinite;
+        }
+        @keyframes blink {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+
+        /* 3. 메인 화면 상단 정보 요약 바 */
+        .info-summary-bar {
+            background: #333;
+            color: #fff;
+            padding: 10px 15px;
+            font-size: 0.8rem;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            line-height: 1.4;
+            cursor: pointer; /* 클릭 가능 표시 */
+        }
+
+        /* 하단 네비게이션 버튼 스타일 */
+        .nav-buttons {
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0; /* 버튼 영역은 줄어들지 않음 */
+        }
+        .btn-nav {
+            padding: 12px 10px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .btn-nav.prev { background-color: #adb5bd; } /* 파스텔 회색 */
+        .btn-nav.next { background-color: var(--primary-color); } /* 파란색 */
+
+        /* 팝업(모달) 스타일 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 10000;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 85%; max-width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .modal-btns { display: flex; gap: 10px; margin-top: 10px; }
+
+        /* 이력 목록 스타일 */
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        .history-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+        .history-item:last-child { border-bottom: none; }
+
+        /* 종합 의견 텍스트 영역 */
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: none;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 1. 스플래시 화면 (최초 실행 시 보임) -->
+<div id="splashScreen" onclick="goToUserInfo()" ontouchstart="goToUserInfo()">
+    <h1>One Point<br>실무측정<br>체크 리스트</h1>
+    <p class="click-hint">화면의 아무곳이나 클릭하세요</p>
+</div>
+
+<!-- 2. 사용자 정보 입력 화면 -->
+<div id="userInfoScreen" class="container hidden">
+    <div class="card" style="margin-top: 20px;">
+        <h3>📋 담당자 정보 입력</h3>
+        <div id="userInfoForm">
+            <!-- 자바스크립트로 자동 생성됨 -->
+        </div>
+        <button class="btn" onclick="goToMainApp()">저장 후 점검 시작</button>
+    </div>
+</div>
+
+<!-- 3. 메인 점검 화면 -->
+<div id="mainAppScreen" class="container hidden">
+    <!-- 상단 정보 요약 -->
+    <div id="userInfoSummary" class="info-summary-bar" onclick="confirmEditUserInfo()"></div>
+
+    <!-- 제품 및 증상 선택 -->
+    <div class="card full-screen" id="productSelectionCard">
+        <h3>🔍 제품 선택</h3>
+        <div id="productGrid" class="grid-options">
+            <!-- 자바스크립트로 버튼 생성됨 -->
+        </div>
+    </div>
+
+    <div class="card full-screen hidden" id="symptomSelectionCard">
+        <h3>🔍 증상 선택</h3>
+        <div id="symptomGrid" class="grid-options">
+            <!-- 자바스크립트로 버튼 생성됨 -->
+        </div>
+        <div class="nav-buttons">
+            <button class="btn-nav prev" onclick="goBackToProduct()">⬅️ 이전</button>
+            <button class="btn-nav next" onclick="goToChecklist()">다음 ➡️</button>
+        </div>
+    </div>
+
+    <!-- 3. 체크리스트 (5단계 프로세스) -->
+    <div id="checklistSection" class="card full-screen hidden">
+        <h3 id="checklistTitle">✅ 점검 프로세스</h3>
+        <div style="margin-bottom: 15px;">
+            <div class="progress-container"><div class="progress-bar" id="checklistProgressBar" style="width: 0%"></div></div>
+            <p id="progressText" style="text-align: right; font-size: 0.9rem; color: #666; margin: 5px 0 0 0;">0% 완료</p>
+        </div>
+        <div id="checklistItems">
+            <!-- 체크박스들이 여기에 생성됨 -->
+        </div>
+        <div class="nav-buttons">
+            <button class="btn-nav prev" onclick="goBackToSymptom()">⬅️ 이전</button>
+            <button class="btn-nav next" onclick="goToOpinion()">다음 ➡️</button>
+        </div>
+    </div>
+
+    <!-- 4. 종합 의견 작성 -->
+    <div id="opinionSection" class="card full-screen hidden">
+        <h3>📝 종합 의견 작성</h3>
+        <div style="flex: 1; display: flex; flex-direction: column;">
+            <textarea id="opinionInput" placeholder="여기에 종합의견을 작성하세요"></textarea>
+        </div>
+        <div class="nav-buttons">
+            <button class="btn-nav prev" onclick="goBackToChecklist()">⬅️ 이전</button>
+            <button class="btn-nav next" onclick="processSave()">저장</button>
+        </div>
+    </div>
+
+    <!-- 5. 저장 이력 확인 및 완료 화면 -->
+    <div id="historyScreen" class="card full-screen hidden">
+        <h3>💾 저장된 점검 이력</h3>
+        <div class="history-list" id="historyListContainer">
+            <!-- 자바스크립트로 이력 목록 생성됨 -->
+        </div>
+        <div style="text-align: center; font-size: 0.8rem; color: #666; margin-bottom: 10px;">
+            총 <span id="historyCount">0</span>건의 점검이 저장되었습니다.
+        </div>
+        <div class="nav-buttons">
+            <button class="btn-nav prev" onclick="goToProductSelectFromHistory()">제품 선택 🔄</button>
+            <button class="btn-nav" style="background-color: #ff8787;" onclick="clearHistoryData()">🗑️ 삭제</button>
+            <button class="btn-nav next" onclick="exportHistoryToExcel()">엑셀 내보내기 📥</button>
+        </div>
+    </div>
+</div>
+
+<!-- 재서비스율 입력 팝업 (숨김 상태) -->
+<div id="reserviceModal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <h3>📊 재서비스율 입력</h3>
+        <label>교육 전 (%)</label>
+        <input type="number" id="modal_reservice_before" placeholder="숫자만 입력 (예: 10)">
+        <label>교육 후 (%)</label>
+        <input type="number" id="modal_reservice_after" placeholder="숫자만 입력 (예: 5)">
+        <div class="modal-btns">
+            <button class="btn" style="background:#ccc; color:#333" onclick="closeReserviceModal()">취소</button>
+            <button class="btn" onclick="saveReserviceRate()">확인</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // ==========================================
+    // [관리자 설정 구역] 이 부분만 수정하면 내용을 바꿀 수 있습니다.
+    // ==========================================
+    
+    // 1. 사용자 기본 정보 필드 (수정됨)
+    const USER_FIELDS = [
+        "담당/실", "센터", "사번", "성명", "교육 이수일자", "재서비스율", "코칭자"
+    ];
+
+    // 2. 제품 및 증상, 점검 리스트 데이터 구조
+    const CHECKLIST_DATA = {
+        "냉장고": {
+            "1. 냉동/냉장 안됨": [
+                "1. 온도 설정 상태 확인<br>2. 음식물 상태 확인<br>3. 냉기 유.무 확인<br>4. COMP 동작 소리 확인<br>5. 냉동실, 냉장실 팬모터 동작 여부 확인<br>6. MAIN PCB 내 LED 깜박임 확인<br>7. All-on Mode에러 확인",
+                "1. 제품 RESET<br>2. 전시 모드 투입 후 해제후 동작 확인<br>3. TEST 모드 1회 진입하여 재확인",
+                "1. COMP 동작 확인 (진동/소리)<br>1) Comp 입력 전압 확인<br>2) Comp 저항값 확인",
+                "1. 응축기 발열유무 확인<br>2. 에바 착상 패턴 확인<br>※ 위 점검 후 이상시:<br>1) Main PCB 교체 또는 중수리 여부 판단<br>2) COMP 진단 JIG 사용진단<br>3) 압력 체크 (평압/고압/저압)",
+                "1. 응축기 발열유무 확인<br>2. 에바 착상 패턴 확인<br>※ 위 점검 후 정상시:<br>1) 팬모터, 댐퍼 단품 점검<br>2) 온도계 온도 측정 후 정상시 사용설명처리"
+            ], // 5개
+            "2. 냉장 약/과냉": [
+                "1. 온도 설정 상태 확인<br>2. 음식물 상태 확인<br>3. 냉기 유.무 확인<br>4. COMP 동작 소리 확인<br>5. 냉동실, 냉장실 팬모터 동작 여부 확인<br>6. MAIN PCB 내 LED 깜박임 확인<br>7. All-on Mode에러확인",
+                "1. 모델별 센서 / 냉기 토출구 위치 확인<br>2. 센서 / 냉기 토출구 음식물로 가려짐 여부 확인",
+                "1. 센서 단품 정상 여부 확인<br>(단품 저항값 또는 입력전압확인)",
+                "1. Test 모드 2 이용한 댐퍼 정상 작동여부 확인<br>2. 댐퍼 작동 불량시 입력전압 확인",
+                "1. 온도계 또는 아르고스 활용 온도 측정 후 정상 시 사용설명처리"
+            ], // 5개
+            "3. 성에/결로/이슬맺힘": [
+                "1. 홈바, 도어 및 가스켓 상태 확인<br>2. 냉동실 프론트C 상태 확인<br>3. 제빙도어 베타 가스켓 확인<br>4. 정수기 냉장고 캡 덕트 상태 확인",
+                "1. 레그 파손 여부 확인 (도어 덜닫힘)<br>2. 수평 상태 확인 (도어단차, 수평)<br>3. 필터 및 수배관 연결부 확인",
+                "1. 중수리 이력 확인 (진공 작업 미흡)<br>2. EVA착상 상태 확인 (상부 결빙)"
+            ], // 3개
+            "4. 배수구 막힘, 누수": [
+                "1. 에바 및 배수구 상태 확인 (결빙 여부 확인)<br>2. 스팀기를 사용하여 일반 결빙 제거 수리 추가적으로 드레인 호스 및 기계실 상태 확인 후 추가 세척<br>3. 드레인 호스 확인 및 드레인 호스 마개 변형 확인",
+                "1. MAIN PCB 내 배수구 히터 PIN 확인하여 배수구 히터 저항과 전압을 측정-단선 유.무를 체크<br>2. 필터 및 수배관 연결부 확인",
+                "1. 기계실 Tube Assmbly, Drain에 Hole 추가 후 배수구 결빙 SVC용 Heater 삽입",
+                "1. Joint Harness 결선 및 정리",
+                "1. PCB Rewriting 또는 Main PCB 교체"
+            ], // 5개
+            "5. 소음 불량": [
+                "1. Door를 일정시간 열었다 Door를 닫은 후 팬모터 동작 여부 확인 (팬모터 동작 여부 확인 후 팬모터 동작 소음을 확인)<br>2. 확인이 어려울 경우 Test 1번 눌러 팬모터 동작<br>3. COMP 동작 상태 확인 (TEST 1 눌러 확인) 및 배관 떨림음 여부 확인<br>4. 3Way 밸브 동작 확인 (전원리셋 또는 3Way 밸브 JIG 연결 동작 확인)",
+                "1. 바람이 잘 나오는지, 배관 떨림음및 COMP 이상 소음은 없는지 촉각과 청각을 이용하여 확인<br>2. 아이스메이커 및 크래프트아이스메이커 이빙동작 시 (Test SW눌러 확인)소음 여부 확인.<br>3. 댐퍼 적용 모델 댐퍼 동작 상태 확인 (Test 버튼을 이용하여 확인)",
+                "1. 이상 소음이 확인되는 경우 덕트를 분해하여 베어링/성에/결빙/팬걸림 등을 육안으로 확인",
+                "1. 성에/결빙/팬걸림이 아니라면 손으로 직접 팬을 돌려 본다(부드럽게 돌아가는지 확인)<br>- 베어링소음<br>- 성에/결빙<br>- 팬 걸림",
+                "1. COMP형명 확인 하여 ( FMA088NBMA, FMA102NAMA, FMA102NBMA, FLD165NBMA) 인경우 PGM 업데이트 확인<br>2. 김치냉장고 24년 11월 이전 제번 PGM 업데이트 여부 확인<br>3. 4도어 냉장고(2025.07월 ~ 11월24일) 냉매음 개선 PGM 업데이트 확인<br>4. 필요에 따라 차음판, 제진재, 시트러버, 공명기, EPDM등 활용 조정 또는 교체"
+            ], // 5개
+            "6. 상냉장하냉동 도어 여닫힘불 ": [
+                "1. 필러 히터 간섭으로 인한 도어 안열림 확인<br>2. 음식물 간섭 여부 및 가스켓 탈거 여부 확인<br>3. 선반 및 병꽂이 조립 상태 확인",
+                "1. 도어 단차/ 수평상태 확인",
+                "1. 도어 상부 힌지, 오토 힌지 상태 확인",
+                "1. 대치 Door 교체 시 도어 안닫힘 확인 (베타 가스켓 Size 상이)",
+                "1. 롤러 파손 상태 확인"
+            ], // 5개
+            "7. 디스펜서/아이스메이커 이상": [
+                "1. All-on 모드 진입하여 에러 확인<br>2. 아이스메이커 ON 상태 확인",
+                "1. 얼음 생성 여부 확인<br>2. 디스펜서 출수 여부확인",
+                "1. 아이스메이커 테스트모드 SW 동작확인",
+                "1. 아이스메이커 급수관 결빙 확인",
+                "1. 도어 하네스 단선 여부 확인<br>2. Sub PCB 확인"
+            ], // 5개
+            "8. 전원/누전": [
+                "1. 누전 차단기 상태 확인",
+                "1. 전원 리셋 후 재확인",
+                "1. 필러 히터 누전 확인",
+                "1. 쉬즈 히터 누전확인",
+                "1. 메가 테스터기 사용 누전 확인"
+            ] // 5개
+        },
+        "세탁기": {
+            "1. IE 에러 불량": [
+                "1. 수도 꼭지 잠금 여부 확인<br>2. 동결 확인<br>3. 급수 밸브 필터 이물 막힘 확인<br>4. 수압 확인<br>5. 테스트모드로 급수동작 확인",
+                "1. 압력센서 단품 점검<br>2. 사이펀 홀 막힘 여부 확인",
+                "1. 급수밸브 단선/막힘 확인<br>2. 급수밸드 연결 하네스 상태 확인",
+                "1. Main Pcb 출력 전압 확인 (급수밸브 입력전압)"
+            ], // 4개
+            "2. OE 에러 불량": [
+                "1. 배수호스 상태 확인 (설치상태, 이물막힘, 동결)",
+                "1. PV Case 이물 막힘 상태 확인",
+                "1. 배수펌프 단품 Check",
+                "1. 압력센서, 압력호스 Check",
+                "1. Main Pcb 출력 전압 확인 (배수펌프 입력전압)"
+            ], // 5개
+            "3. LE 에러 불량(홀센서 모델)": [
+                "1. 테스트 모드로 모터 회전 여부 확인",
+                "1. 홀센서 단품 Check<br>2. 스테이터 단품 Check<br>3. 로터 자석 상태 확인",
+                "1. Main Pcb 출력 전압 확인 (홀센서 입력전압)"
+            ], // 3개
+            "4. LE 에러 불량(센서리스 모델)": [
+                "1. 테스트 모드로 모터 회전 여부 확인",
+                "1. 스테이터 단품 Check<br>2. 로터 자석 상태 확인",
+                "1. 메인-스테이터 하네스 단선 확인<br>2. 인버터 PCB 출력 전압 확인(인버터 PCB적용모델)"
+            ], // 3개
+            "5. DE/DL 에러 불량": [
+                "1. 도어 Lock 동작상태 확인<br>2. 제품 수평상태 확인 (도어 처짐/ 가스켓확인)<br>2. 리드 자석 부착 상태 확인 (통돌이)",
+                "1. 제품 수평상태 확인 (도어 처짐/ 가스켓확인)",
+                "1. 리드스위치, 리드 Lock, 도어 SW 단품 Check.",
+                "1. Main Pcb 전압 확인"
+            ], // 4개
+            "6. DHE/TE/FF 에러 불량": ["1. 건조 팬모터 동작 상태 확인", "1. 건조펜 연결 하네스 단선 확인", "1. Main Pcb 전압 확인"], // 3개
+            "7. 전원 무감": ["1. 벽면 콘센트 전압 Check", "1. 노이즈 필터 입/출력 전압 확인(fuse 단선)", "1. Sub Pcb 전압 확인", "1. Main Pcb 전압 확인"], // 4개
+            "8. 소음/진동": [
+                "1. 세탁물 상태 확인 (과다투입, 사용불가세탁물, 대형 세탁물 투입, 세탁망 사용(단독))<br>2. 수평상태 확인 (수평계 확인)",
+                "1. 테스트 모드로 탈수 동작 확인(설치모드)",
+                "1. 내부 이물질 유입여부 확인<br>2. 미끌어짐 일 경우 스토퍼 (신형으로 변경 기존 검정->신형 회색)"
+            ], // 3개
+            "9. 누수": [
+                "1. 원터치 조립부 확인(원터치 내부 가스켓 변형 확인)<br>2. 배수호스, 급수호스 상태 확인<br>3. 겨울철 결로 확인<br>4. 주변 환경 누수 확인(보일러등)<br>5. 세제 과다 사용 및 오사용(일반세탁기용 드럼사용)",
+                "1. 가스켓 찢어짐 확인<br>2. 배수필터 조립상태 확인<br>3. 디스펜서부 누수 확인",
+                "1. 밸로우즈 찢어짐 확인<br>2. 급수밸드 동파 확인<br>3. 내부 호스류 파손 확인<br>4. 아웃케이스 파손 확인"
+            ] // 3개
+        },
+        "건조기": {
+            "1. 건조약/건조안됨": [
+                "1. 디스플레이 에러 표시됨 확인<br>2. 필터 막힘 확인",
+                "1. 콘덴서 이물 과다 상태 확인<br>2. 싸이클 냉매누설 (15분동작 소비전력 Check)",
+                "1. 테스트 모드로 콤프 동작상태 확인<br>2. 테스트 모드로 H 값 확인<br>3. 테스트 모드로 L 값 확인<br>4. Data Vview 확인<br>5. 블랙박스, Argus 점검",
+                "1. Comp 단품 저항값 확인"
+            ], // 4개
+            "2. 소음/진동": [
+                "1. 테스트 모드로 드럼 회전 동작상태 확인<br>2. 케이스 떨림음 확인",
+                "1. 롤러 상태 Check<br>2. 댐핑 시트 탈거 Check.<br>3. 팬모터 상태 Check.",
+                "1. 감속기 동작 상태 확인",
+                "1. 배수펌프 동작 상태 확인"
+            ] // 4개
+        }
+    };
+
+    // 증상별 아이콘 매핑 (SVG) - 오프라인 지원
+    function getSymptomIcon(symptomName) {
+        const name = symptomName.toLowerCase();
+        let svg = "";
+        
+        // 키워드에 따른 아이콘 선택
+        if (name.includes("전원") || name.includes("power")) {
+            // 번개 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ffcc80"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg>`; /* 파스텔 옐로우/오렌지 */
+        } else if (name.includes("소음") || name.includes("진동")) {
+            // 소리/파동 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#b0bec5"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`; /* 파스텔 그레이 */
+        } else if (name.includes("누수") || name.includes("물") || name.includes("배수") || name.includes("급수")) {
+            // 물방울 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#81d4fa"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`; /* 파스텔 블루 */
+        } else if (name.includes("도어") || name.includes("문")) {
+            // 문 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#bcaaa4"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0v16H5V5h7zm7 16h-5V5h5v14zm-3-8h-2v2h2v-2z"/></svg>`; /* 파스텔 브라운 */
+        } else if (name.includes("에러") || name.includes("디스플레이") || name.includes("화면")) {
+            // 경고/화면 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#ef9a9a"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`; /* 파스텔 레드 */
+        } else if (name.includes("냉동") || name.includes("냉장") || name.includes("온도")) {
+            // 온도계 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#80deea"><path d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1v1h-2V5z"/></svg>`; /* 파스텔 시안 */
+        } else {
+            // 기본 체크리스트 아이콘
+            svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#a5d6a7"><path d="M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>`; /* 파스텔 그린 */
+        }
+
+        // Base64로 변환하여 img src에 넣을 수 있게 처리
+        return "data:image/svg+xml;base64," + btoa(svg);
+    }
+
+    // 제품별 아이콘 이미지 주소 매핑
+    const PRODUCT_ICONS = {
+        // [이미지 코드 심는 방법]
+        // 인터넷에 '이미지 base64 변환' 검색 -> 변환 사이트에서 사진 업로드 -> 결과값(data:image...)을 복사해서 아래 따옴표 안에 붙여넣으세요.
+        "냉장고": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIzMiIgaGVpZ2h0PSI1NiIgcng9IjIiIGZpbGw9IiNlM2YyZmQiIHN0cm9rZT0iIzIxOTZmMyIgc3Ryb2tlLXdpZHRoPSIyIi8+PGxpbmUgeDE9IjE2IiB5MT0iMjAiIHgyPSI0OCIgeTI9IjIwIiBzdHJva2U9IiMyMTk2ZjMiIHN0cm9rZS13aWR0aD0iMiIvPjxsaW5lIHgxPSIzMiIgeTE9IjIwIiB4Mj0iMzIiIHkyPSI2MCIgc3Ryb2tlPSIjMjE5NmYzIiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=", 
+        "세탁기": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3QgeD0iMTIiIHk9IjgiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0OCIgcng9IjIiIGZpbGw9IiNmNWY1ZjUiIHN0cm9rZT0iIzYxNjE2MSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTIiIGZpbGw9IiNiM2U1ZmMiIHN0cm9rZT0iIzYxNjE2MSIgc3Ryb2tlLXdpZHRoPSIyIi8+PGxpbmUgeDE9IjEyIiB5MT0iMTYiIHgyPSI1MiIgeTI9IjE2IiBzdHJva2U9IiM2MTYxNjEiIHN0cm9rZS13aWR0aD0iMiIvPjxjaXJjbGUgY3g9IjQ0IiBjeT0iMTIiIHI9IjIiIGZpbGw9IiNlZjUzNTAiLz48L3N2Zz4=", 
+        "건조기": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3QgeD0iMTIiIHk9IjgiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0OCIgcng9IjIiIGZpbGw9IiNmZmYzZTAiIHN0cm9rZT0iI2ZmOTgwMCIgc3Ryb2tlLXdpZHRoPSIyIi8+PGNpcmNsZSBjeD0iMzIiIGN5PSIzMiIgcj0iMTIiIGZpbGw9IiNmZmUwYjIiIHN0cm9rZT0iI2ZmOTgwMCIgc3Ryb2tlLXdpZHRoPSIyIi8+PGxpbmUgeDE9IjEyIiB5MT0iMTYiIHgyPSI1MiIgeTI9IjE2IiBzdHJva2U9IiNmZjk4MDAiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg=="
+    };
+
+    // 현재 선택된 상태 저장 변수
+    let currentProduct = "";
+    let currentSymptom = "";
+    
+    // 체크리스트 상태 저장 변수 (화면 이동 시 유지용)
+    const checklistState = {}; // Key: "제품_증상", Value: Set(체크된 항목 인덱스)
+    const opinionState = {};   // Key: "제품명", Value: String(종합의견 내용)
+    let currentEntryId = null; // 현재 점검 항목의 고유 ID (중복 방지용)
+
+    // ==========================================
+    // [앱 로직] 아래는 수정하지 않아도 됩니다.
+    // ==========================================
+
+    // 초기화 실행
+    window.onload = function() {
+        renderUserFields();
+        loadUserInfo();
+        renderProductOptions();
+    };
+
+    // 화면 전환: 스플래시 -> 정보 입력
+    function goToUserInfo() {
+        document.getElementById('splashScreen').classList.add('hidden');
+        document.getElementById('userInfoScreen').classList.remove('hidden');
+    }
+
+    // 화면 전환: 정보 입력 -> 메인 앱
+    function goToMainApp() {
+        // 정보 저장
+        saveUserInfo();
+        
+        // 요약 정보 표시
+        updateSummaryBar();
+
+        document.getElementById('userInfoScreen').classList.add('hidden');
+        document.getElementById('mainAppScreen').classList.remove('hidden');
+    }
+
+    // 담당자 정보 수정 확인 팝업
+    function confirmEditUserInfo() {
+        if(confirm("담당자 정보를 수정하시겠습니까?")) {
+            document.getElementById('mainAppScreen').classList.add('hidden');
+            document.getElementById('userInfoScreen').classList.remove('hidden');
+        }
+    }
+
+    // 상단 요약 바 업데이트
+    function updateSummaryBar() {
+        const summaryDiv = document.getElementById('userInfoSummary');
+        const values = [];
+        USER_FIELDS.forEach((field, index) => {
+            const val = document.getElementById('user_field_' + index).value;
+            if(val) values.push(val);
+        });
+        // "홍길동 | A센터 | ..." 형태로 표시
+        summaryDiv.innerText = values.join(' | ');
+    }
+
+    // 1. 사용자 정보 필드 생성 및 로드
+    function renderUserFields() {
+        const container = document.getElementById('userInfoForm');
+        container.innerHTML = ''; // 초기화
+        USER_FIELDS.forEach((field, index) => {
+            const label = document.createElement('label');
+            label.innerText = field;
+            container.appendChild(label);
+            
+            if (field === '교육 이수일자') {
+                // 달력 입력창
+                const input = document.createElement('input');
+                input.type = 'date';
+                input.id = 'user_field_' + index;
+                container.appendChild(input);
+            } else if (field === '재서비스율') {
+                // 팝업 트리거용 가짜 입력창
+                const div = document.createElement('div');
+                div.className = 'fake-input';
+                div.onclick = openReserviceModal;
+                div.innerHTML = `<span class="placeholder">터치하여 입력하세요</span>`;
+                div.id = 'reservice_ui_display';
+                container.appendChild(div);
+
+                // 실제 값 저장용 숨겨진 입력창
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.id = 'user_field_' + index;
+                container.appendChild(hiddenInput);
+            } else {
+                // 일반 텍스트 입력창
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = 'user_field_' + index;
+                input.placeholder = field + ' 입력';
+                container.appendChild(input);
+            }
+        });
+    }
+
+    // 로컬 스토리지에 사용자 정보 저장
+    function saveUserInfo() {
+        const userData = {};
+        USER_FIELDS.forEach((field, index) => {
+            const val = document.getElementById('user_field_' + index).value;
+            userData['field_' + index] = val;
+        });
+        localStorage.setItem('myChecklistUserInfo', JSON.stringify(userData));
+    }
+
+    // 로컬 스토리지에서 사용자 정보 불러오기
+    function loadUserInfo() {
+        const savedData = localStorage.getItem('myChecklistUserInfo');
+        if (savedData) {
+            const userData = JSON.parse(savedData);
+            USER_FIELDS.forEach((field, index) => {
+                const input = document.getElementById('user_field_' + index);
+                if (input && userData['field_' + index]) {
+                    input.value = userData['field_' + index];
+                    // 재서비스율 UI 업데이트 (저장된 값이 있을 경우)
+                    if (USER_FIELDS[index] === '재서비스율') {
+                        updateReserviceUI(input.value);
+                    }
+                }
+            });
+        }
+    }
+
+    // --- 재서비스율 팝업 관련 함수 ---
+    function openReserviceModal() {
+        document.getElementById('reserviceModal').classList.remove('hidden');
+    }
+
+    function closeReserviceModal() {
+        document.getElementById('reserviceModal').classList.add('hidden');
+    }
+
+    function saveReserviceRate() {
+        const before = document.getElementById('modal_reservice_before').value;
+        const after = document.getElementById('modal_reservice_after').value;
+
+        if (!before || !after) {
+            alert("교육 전/후 값을 모두 입력해주세요.");
+            return;
+        }
+
+        // 저장할 문자열 포맷 생성
+        const displayStr = `교육전: ${before}%  /  교육후: ${after}%`;
+        
+        // 숨겨진 input에 값 저장 (엑셀 및 로컬스토리지용)
+        // 재서비스율 필드의 인덱스를 찾아서 저장
+        const index = USER_FIELDS.indexOf("재서비스율");
+        document.getElementById('user_field_' + index).value = displayStr;
+
+        // 화면 UI 업데이트
+        updateReserviceUI(displayStr);
+        
+        closeReserviceModal();
+    }
+
+    function updateReserviceUI(valueStr) {
+        const ui = document.getElementById('reservice_ui_display');
+        if (!valueStr) return;
+        
+        // "교육전: 10% / 교육후: 5%" 문자열을 파싱해서 좌우로 배치
+        const parts = valueStr.split('/');
+        if (parts.length === 2) {
+            ui.innerHTML = `<span>${parts[0].trim()}</span> <span>${parts[1].trim()}</span>`;
+        } else {
+            ui.innerText = valueStr;
+        }
+    }
+    // -----------------------------
+
+    // 2. 제품 목록 렌더링
+    function renderProductOptions() {
+        const container = document.getElementById('productGrid');
+        container.innerHTML = ''; // 초기화
+
+        for (const product in CHECKLIST_DATA) {
+            const btn = document.createElement('div');
+            btn.className = 'option-card';
+            
+            // 아이콘 이미지 추가
+            const img = document.createElement('img');
+            img.src = PRODUCT_ICONS[product];
+            btn.appendChild(img);
+
+            const span = document.createElement('span');
+            span.innerText = product;
+            btn.appendChild(span);
+
+            btn.onclick = function() { selectProduct(product, btn); };
+            container.appendChild(btn);
+        }
+    }
+
+    // 제품 선택 시 실행
+    function selectProduct(product, element) {
+        currentProduct = product;
+        currentSymptom = ""; // 제품이 바뀌면 증상 초기화
+
+        // 다음 화면으로 이동 (제품 선택 숨김 -> 증상 선택 표시)
+        document.getElementById('productSelectionCard').classList.add('hidden');
+        document.getElementById('symptomSelectionCard').classList.remove('hidden');
+
+        loadSymptoms(product);
+    }
+
+    // [이전] 증상 선택 -> 제품 선택으로 돌아가기
+    function goBackToProduct() {
+        document.getElementById('symptomSelectionCard').classList.add('hidden');
+        document.getElementById('productSelectionCard').classList.remove('hidden');
+    }
+
+    // 3. 증상 목록 로드
+    function loadSymptoms(product) {
+        const container = document.getElementById('symptomGrid');
+        
+        // 초기화
+        container.innerHTML = '';
+
+        const symptoms = CHECKLIST_DATA[product];
+        for (const symptom in symptoms) {
+            const btn = document.createElement('div');
+            btn.className = 'option-card';
+            
+            const img = document.createElement('img');
+            img.src = getSymptomIcon(symptom);
+            btn.appendChild(img);
+
+            const span = document.createElement('span');
+            span.innerText = symptom;
+            btn.appendChild(span);
+
+            btn.onclick = function() { selectSymptom(symptom, btn); };
+            container.appendChild(btn);
+        }
+    }
+
+    // 증상 선택 시 실행
+    function selectSymptom(symptom, element) {
+        currentSymptom = symptom;
+        
+        // 증상 선택 시 새로운 ID 생성 (이전 버튼으로 돌아온 경우가 아닐 때)
+        // 하지만 여기서는 단순히 선택만 하고 '다음'을 눌러야 체크리스트로 가므로
+        // 실제 ID 생성은 체크리스트 진입 시 혹은 저장 시점에 관리할 수도 있지만,
+        // "이전 버튼 눌렀을 때만 유지" 조건에 따라, 새로 진입하면 ID를 새로 따는게 맞음.
+        // 다만, 뒤로가기로 왔을 때는 element에 .selected가 이미 있을 수 있음.
+        // 여기서는 UI 처리만 하고, 데이터 로직은 goToChecklist 등에서 처리.
+        
+        // 만약 이전에 생성된 ID가 없다면 새로 생성 (새로운 점검 시작)
+        if (!currentEntryId) {
+            currentEntryId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+        }
+
+        // 스타일 업데이트 (선택된 것만 강조)
+        const buttons = document.querySelectorAll('#symptomGrid .option-card');
+        buttons.forEach(b => b.classList.remove('selected'));
+        element.classList.add('selected');
+    }
+
+    // [이전] 체크리스트 -> 증상 선택으로 돌아가기
+    function goBackToSymptom() {
+        document.getElementById('checklistSection').classList.add('hidden');
+        document.getElementById('symptomSelectionCard').classList.remove('hidden');
+    }
+
+    // [다음] 증상 선택 완료 -> 체크리스트 화면으로 이동
+    function goToChecklist() {
+        if (!currentSymptom) {
+            alert("증상을 선택해주세요.");
+            return;
+        }
+
+        document.getElementById('symptomSelectionCard').classList.add('hidden');
+        document.getElementById('checklistSection').classList.remove('hidden');
+
+        loadChecklist();
+    }
+
+    // 4. 체크리스트 로드
+    function loadChecklist() {
+        const checklistSection = document.getElementById('checklistSection');
+        const checklistItems = document.getElementById('checklistItems');
+        const checklistTitle = document.getElementById('checklistTitle');
+
+        if (!currentProduct || !currentSymptom) return;
+
+        // 제목 설정
+        checklistTitle.innerText = `✅ [${currentProduct}] ${currentSymptom} 점검`;
+        
+        // 리스트 초기화
+        checklistItems.innerHTML = '';
+        
+        // 항목 생성
+        const steps = CHECKLIST_DATA[currentProduct][currentSymptom];
+        steps.forEach((step, index) => {
+            const div = document.createElement('div');
+            div.className = 'checklist-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = 'check_step_' + index;
+            checkbox.value = step;
+
+            // 저장된 상태 복원
+            const stateKey = `${currentProduct}_${currentSymptom}`;
+            if (checklistState[stateKey] && checklistState[stateKey].has(index)) {
+                checkbox.checked = true;
+                div.classList.add('checked');
+            }
+
+            // 체크박스 클릭 시 스타일 변경 이벤트
+            div.onclick = function(e) {
+                // 이벤트 버블링 방지 (체크박스 직접 클릭 시 중복 방지)
+                // label 내부 요소(span 등)를 클릭했을 때도 label이 이벤트를 처리하므로 제외해야 함
+                if (e.target.tagName !== 'INPUT' && !e.target.closest('label')) {
+                    checkbox.click();
+                }
+            };
+            checkbox.onchange = function() {
+                // 상태 업데이트
+                if (!checklistState[stateKey]) {
+                    checklistState[stateKey] = new Set();
+                }
+
+                if(this.checked) {
+                    div.classList.add('checked');
+                    checklistState[stateKey].add(index);
+                }
+                else {
+                    div.classList.remove('checked');
+                    checklistState[stateKey].delete(index);
+                }
+                updateProgressBar(); // 진행률 업데이트
+            };
+
+            const label = document.createElement('label');
+            label.htmlFor = 'check_step_' + index; // 라벨을 체크박스와 연결
+            
+            // 단계 번호 (뱃지)
+            const badge = document.createElement('span');
+            badge.className = 'step-badge';
+            badge.innerText = String(index + 1).padStart(2, '0'); // 01, 02 형태
+            
+            // 내용
+            const content = document.createElement('span');
+            content.innerHTML = step;
+
+            label.appendChild(badge);
+            label.appendChild(content);
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            checklistItems.appendChild(div);
+        });
+
+        checklistSection.classList.remove('hidden');
+        updateProgressBar(); // 초기 로드 시 진행률 표시
+    }
+
+    // [기능] 진행률 바 업데이트
+    function updateProgressBar() {
+        const checkboxes = document.querySelectorAll('#checklistItems input[type="checkbox"]');
+        const total = checkboxes.length;
+        const checked = document.querySelectorAll('#checklistItems input[type="checkbox"]:checked').length;
+        
+        const percent = total === 0 ? 0 : Math.round((checked / total) * 100);
+        
+        document.getElementById('checklistProgressBar').style.width = percent + "%";
+        document.getElementById('progressText').innerText = `${percent}% 완료 (${checked}/${total})`;
+    }
+
+    // [다음] 체크리스트 -> 종합 의견 작성으로 이동
+    function goToOpinion() {
+        document.getElementById('checklistSection').classList.add('hidden');
+        document.getElementById('opinionSection').classList.remove('hidden');
+    }
+
+    // [이전] 종합 의견 -> 체크리스트로 돌아가기
+    function goBackToChecklist() {
+        document.getElementById('opinionSection').classList.add('hidden');
+        document.getElementById('checklistSection').classList.remove('hidden');
+    }
+
+    // 5. 저장 처리 (임시 저장 후 팝업)
+    function processSave() {
+        // 현재 시간 (저장 일시)
+        const now = new Date();
+        const timeStr = now.getFullYear() + "-" + 
+                        String(now.getMonth() + 1).padStart(2, '0') + "-" + 
+                        String(now.getDate()).padStart(2, '0') + " " + 
+                        String(now.getHours()).padStart(2, '0') + ":" + 
+                        String(now.getMinutes()).padStart(2, '0');
+
+        // 엑셀 저장용 행 데이터 객체 생성 (가로 1줄)
+        // 순서를 보장하기 위해 키 입력 순서에 주의하거나, 나중에 header 옵션 사용
+        const rowData = {
+            // 고유 ID 저장 (엑셀 출력 제외용, 내부 관리용)
+            "_id": currentEntryId || (Date.now().toString() + Math.random().toString(36).substr(2, 9)),
+            "저장일시": timeStr
+        };
+
+        // (1) 사용자 정보 매핑
+        USER_FIELDS.forEach((field, index) => {
+            const val = document.getElementById('user_field_' + index).value || "";
+            
+            if (field === "재서비스율") {
+                // "교육전: 10%  /  교육후: 5%" 형식에서 숫자만 추출하여 분리
+                let before = "";
+                let after = "";
+                if (val.includes("/")) {
+                    const parts = val.split("/");
+                    before = parts[0].replace(/[^0-9]/g, ""); // 숫자만 추출
+                    after = parts[1].replace(/[^0-9]/g, "");
+                }
+                rowData["재서비스율[교육전]"] = before;
+                rowData["재서비스율[교육후]"] = after;
+            } else {
+                rowData[field] = val;
+            }
+        });
+
+        // (2) 제품 및 증상
+        rowData["제품"] = currentProduct;
+        rowData["증상"] = currentSymptom;
+
+        // (3) 점검항목 (체크된 번호만 쉼표로 구분해서 저장)
+        const checkboxes = document.querySelectorAll('#checklistItems input[type="checkbox"]');
+        let checklistResults = [];
+        checkboxes.forEach((box, index) => {
+            if (box.checked) {
+                checklistResults.push(index + 1);
+            }
+        });
+        rowData["점검항목"] = checklistResults.join(", ");
+
+        // (4) 종합 의견
+        rowData["종합의견"] = document.getElementById('opinionInput').value;
+
+        // --- 누적 저장 로직 ---
+        // 기존 데이터 불러오기
+        let historyData = JSON.parse(localStorage.getItem('checklistHistoryData') || "[]");
+
+        // [중복 방지] 고유 ID(_id)를 기준으로 수정 여부 판단
+        const existingIndex = historyData.findIndex(item => item["_id"] === rowData["_id"]);
+
+        if (existingIndex !== -1) {
+            // 이미 존재하면 -> 덮어쓰기 (Update)
+            historyData[existingIndex] = rowData;
+        } else {
+            // 없으면 -> 새로 추가 (Insert)
+            historyData.push(rowData);
+        }
+        
+        // 다시 로컬 스토리지에 저장 (다음 번 추가를 위해)
+        localStorage.setItem('checklistHistoryData', JSON.stringify(historyData));
+
+        // 저장 후 상태 초기화 (이전 체크사항 삭제)
+        delete checklistState[`${currentProduct}_${currentSymptom}`];
+        // 종합의견은 제품별 공유이므로 유지할지 삭제할지 결정해야 하나, 
+        // "저장버튼 누르면 이전 체크사항 없어지게해" 요구사항에 따라 해당 세션 종료로 판단.
+        // 하지만 종합의견은 제품 단위 공유라 다른 증상 점검 시 필요할 수 있음.
+        // 사용자 요구: "종합의견 작성후 저장버튼 누르면 이전 체크사항 없어지게해" -> 체크리스트 초기화.
+        
+        // 이력 화면으로 이동
+        showHistoryScreen();
+    }
+
+    // [화면] 이력 화면 표시
+    function showHistoryScreen() {
+        document.getElementById('opinionSection').classList.add('hidden');
+        document.getElementById('historyScreen').classList.remove('hidden');
+        renderHistoryList();
+    }
+
+    // [기능] 이력 목록 렌더링
+    function renderHistoryList() {
+        const historyData = JSON.parse(localStorage.getItem('checklistHistoryData') || "[]");
+        const container = document.getElementById('historyListContainer');
+        const countSpan = document.getElementById('historyCount');
+        
+        container.innerHTML = '';
+        countSpan.innerText = historyData.length;
+
+        // 최신순으로 표시
+        [...historyData].reverse().forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            // 표시 내용: [제품] 증상 (점검항목: 1, 2...)
+            div.innerHTML = `<strong>[${item['제품']}]</strong> ${item['증상']}<br>
+                             <span style="color:#666; font-size:0.8rem;">점검: ${item['점검항목'] || '-'} / ${item['저장일시']}</span>`;
+            container.appendChild(div);
+        });
+    }
+
+    // [버튼] 이력 화면 -> 제품 선택 (새로운 점검 시작)
+    function goToProductSelectFromHistory() {
+        // 앱 리셋 (입력값 초기화)
+        resetApp(); 
+        
+        document.getElementById('historyScreen').classList.add('hidden');
+        document.getElementById('productSelectionCard').classList.remove('hidden');
+        window.scrollTo(0, 0);
+    }
+
+    // [버튼] 엑셀 내보내기
+    function exportHistoryToExcel() {
+        if (!confirm("현재까지 저장된 이력을 엑셀로 내보내시겠습니까?")) return;
+
+        // 현재 시간 생성 (파일명용)
+        const now = new Date();
+        const timeStr = now.getFullYear() + "-" + 
+                        String(now.getMonth() + 1).padStart(2, '0') + "-" + 
+                        String(now.getDate()).padStart(2, '0') + " " + 
+                        String(now.getHours()).padStart(2, '0') + ":" + 
+                        String(now.getMinutes()).padStart(2, '0');
+
+        const historyData = JSON.parse(localStorage.getItem('checklistHistoryData') || "[]");
+
+        // 엑셀 헤더 순서 지정
+        const headerOrder = [
+            "저장일시", "담당/실", "센터", "사번", "성명", "교육 이수일자", 
+            "재서비스율[교육전]", "재서비스율[교육후]", "코칭자", 
+            "제품", "증상", "점검항목", "종합의견"
+        ];
+
+        // 엑셀 워크시트 생성 (헤더 순서 적용)
+        const ws = XLSX.utils.json_to_sheet(historyData, { header: headerOrder });
+        
+        // 컬럼 너비 조정
+        ws['!cols'] = [
+            { wch: 20 }, // 저장일시
+            { wch: 10 }, // 담당/실
+            { wch: 10 }, // 센터
+            { wch: 10 }, // 사번
+            { wch: 10 }, // 성명
+            { wch: 15 }, // 교육 이수일자
+            { wch: 10 }, // 재서비스율[교육전]
+            { wch: 10 }, // 재서비스율[교육후]
+            { wch: 10 }, // 코칭자
+            { wch: 10 }, // 제품
+            { wch: 20 }, // 증상
+            { wch: 50 }, // 점검항목 (내용이 길어서 넓게)
+            { wch: 30 }  // 종합의견
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "점검결과");
+
+        // 파일명 생성
+        const fileName = `점검결과_누적_${timeStr.replace(/[-: ]/g, '')}.xlsx`;
+
+        // 파일 다운로드
+        XLSX.writeFile(wb, fileName);
+
+    }
+
+    // 앱 초기화 함수
+    function resetApp() {
+        // 입력값 초기화
+        document.getElementById('opinionInput').value = "";
+        currentProduct = "";
+        currentSymptom = "";
+        currentEntryId = null; // ID 초기화 (새로운 점검)
+        
+        // 체크리스트 상태 초기화 (새로운 세션 시작)
+        for (const key in checklistState) delete checklistState[key];
+        
+        // 화면 이동 (메인 화면으로)
+        document.getElementById('opinionSection').classList.add('hidden');
+        document.getElementById('checklistSection').classList.add('hidden');
+        document.getElementById('symptomSelectionCard').classList.add('hidden');
+        document.getElementById('productSelectionCard').classList.remove('hidden');
+        
+        // 스크롤 맨 위로
+        window.scrollTo(0, 0);
+    }
+
+    // [기능] 누적 데이터 삭제 (비밀번호 보호)
+    function clearHistoryData() {
+        if(confirm("정말로 누적된 모든 점검 데이터를 삭제하시겠습니까?\n(삭제 후에는 복구할 수 없습니다)")) {
+            const password = prompt("데이터를 삭제하려면 관리자 비밀번호를 입력하세요.\n(기본값: 1234)");
+            if (password === "1234") {
+                localStorage.removeItem('checklistHistoryData');
+                alert("누적 데이터가 삭제되었습니다. 새로운 점검을 시작하세요.");
+                renderHistoryList(); // 목록 새로고침
+            } else if (password !== null) {
+                alert("비밀번호가 일치하지 않습니다.");
+            }
+        }
+    }
+</script>
+
+</body>
+</html>
