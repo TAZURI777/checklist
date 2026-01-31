@@ -752,11 +752,6 @@
         const before = document.getElementById('modal_reservice_before').value;
         const after = document.getElementById('modal_reservice_after').value;
 
-        if (!before || !after) {
-            alert("교육 전/후 값을 모두 입력해주세요.");
-            return;
-        }
-
         // 저장할 문자열 포맷 생성
         const displayStr = `교육전: ${before}%  /  교육후: ${after}%`;
         
@@ -1101,8 +1096,7 @@
             const div = document.createElement('div');
             div.className = 'history-item';
             // 표시 내용: [제품] 증상 (점검항목: 1, 2...)
-            div.innerHTML = `<strong>[${item['제품']}]</strong> ${item['증상']}<br>
-                             <span style="color:#666; font-size:0.8rem;">점검: ${item['점검항목'] || '-'} / ${item['저장일시']}</span>`;
+            div.innerHTML = `<strong>[${item['제품']}]</strong> ${item['증상']} <span style="color:#666; font-size:0.8rem;">| 점검: ${item['점검항목'] || '-'} | ${item['저장일시']}</span>`;
             container.appendChild(div);
         });
     }
